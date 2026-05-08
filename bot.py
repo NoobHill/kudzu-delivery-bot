@@ -2,15 +2,11 @@
 Delivery Confirmation Bot
 ========================
 Commands:
-  /delivered ORD-001         → marks order as Delivered
-  /shipped ORD-001           → marks order as Shipped
-  /status ORD-001            → checks current status of an order
-  /pending                   → lists all pending orders
-  /summary                   → shows today's delivery count
-
-Setup:
-  pip install python-telegram-bot gspread google-auth
-  Set env vars: BOT_TOKEN, SHEET_ID, GOOGLE_CREDS_JSON
+  /delivered ORD-001         -> marks order as Delivered
+  /shipped ORD-001           -> marks order as Shipped
+  /status ORD-001            -> checks current status of an order
+  /pending                   -> lists all pending orders
+  /summary                   -> shows today's delivery count
 """
 
 import os
@@ -18,7 +14,7 @@ import json
 import logging
 from datetime import datetime
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, ContextTypes
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -28,19 +24,19 @@ logging.basicConfig(
 )
 
 # ── Config ──────────────────────────────────────────────
-BOT_TOKEN   = os.environ["BOT_TOKEN"]        # From @BotFather
-SHEET_ID    = os.environ["SHEET_ID"]         # Google Sheet ID from URL
-CREDS_JSON  = os.environ["GOOGLE_CREDS_JSON"]# Service account JSON string
+BOT_TOKEN  = os.environ["BOT_TOKEN"]
+SHEET_ID   = os.environ["SHEET_ID"]
+CREDS_JSON = os.environ["GOOGLE_CREDS_JSON"]
 
-ORDERS_SHEET  = "📋 Orders"
-ORDER_ID_COL  = 1   # Column A
-STATUS_COL    = 8   # Column H
-DATE_COL      = 2   # Column B
-PRODUCT_COL   = 4   # Column D
-CUSTOMER_COL  = 3   # Column C
-LOCATION_COL  = 5   # Column E
-QTY_COL       = 6   # Column F
-HEADER_ROW    = 3   # Row 3 is the header
+ORDERS_SHEET = "📋 Orders"
+ORDER_ID_COL = 1
+STATUS_COL   = 8
+DATE_COL     = 2
+PRODUCT_COL  = 4
+CUSTOMER_COL = 3
+LOCATION_COL = 5
+QTY_COL      = 6
+HEADER_ROW   = 3
 
 # ── Google Sheets connection ─────────────────────────────
 def get_sheet():
@@ -54,7 +50,6 @@ def get_sheet():
     return client.open_by_key(SHEET_ID).worksheet(ORDERS_SHEET)
 
 def find_order_row(sheet, order_id: str):
-    """Return (row_index, row_data) or (None, None) if not found."""
     all_rows = sheet.get_all_values()
     for i, row in enumerate(all_rows, 1):
         if i <= HEADER_ROW:
@@ -68,9 +63,8 @@ def update_status(sheet, row_index: int, new_status: str):
 
 # ── Bot handlers ─────────────────────────────────────────
 async def cmd_delivered(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Usage: /delivered ORD-001"""
     if not ctx.args:
-        await update.message.reply_text("❌ Usage: /delivered ORD-001")
+        await update.message.reply_text("Usage: /delivered ORD-001")
         return
 
     order_id = ctx.args[0].upper()
@@ -81,15 +75,15 @@ async def cmd_delivered(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         row, data = find_order_row(sheet, order_id)
 
         if not row:
-            await update.message.reply_text(f"❌ Order *{order_id}* not found.", parse_mode="Markdown")
+            await update.message.reply_text(f"Order {order_id} not found.")
             return
 
         current = data[STATUS_COL - 1]
-        if current == "✅ Delivered":
-            await update.message.reply_text(f"ℹ️ *{order_id}* is already marked Delivered.", parse_mode="Markdown")
+        if "Delivered" in current:
+            await update.message.reply_text(f"{order_id} is already marked Delivered.")
             return
 
-        update_status(sheet, row, "✅ Delivered")
+        update_status(sheet, row, "Delivered")
 
         product  = data[PRODUCT_COL - 1]
         customer = data[CUSTOMER_COL - 1]
@@ -97,23 +91,21 @@ async def cmd_delivered(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         qty      = data[QTY_COL - 1]
 
         await update.message.reply_text(
-            f"✅ *{order_id}* marked as Delivered!\n\n"
-            f"👤 Customer: {customer}\n"
-            f"📦 Product: {product} (x{qty})\n"
-            f"📍 Location: {location}\n"
-            f"👤 Confirmed by: {user}",
-            parse_mode="Markdown"
+            f"Delivered: {order_id}\n\n"
+            f"Customer: {customer}\n"
+            f"Product: {product} (x{qty})\n"
+            f"Location: {location}\n"
+            f"Confirmed by: {user}"
         )
 
     except Exception as e:
         logging.error(e)
-        await update.message.reply_text(f"⚠️ Error updating sheet: {e}")
+        await update.message.reply_text(f"Error: {e}")
 
 
 async def cmd_shipped(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Usage: /shipped ORD-001"""
     if not ctx.args:
-        await update.message.reply_text("❌ Usage: /shipped ORD-001")
+        await update.message.reply_text("Usage: /shipped ORD-001")
         return
 
     order_id = ctx.args[0].upper()
@@ -124,27 +116,25 @@ async def cmd_shipped(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         row, data = find_order_row(sheet, order_id)
 
         if not row:
-            await update.message.reply_text(f"❌ Order *{order_id}* not found.", parse_mode="Markdown")
+            await update.message.reply_text(f"Order {order_id} not found.")
             return
 
-        update_status(sheet, row, "🚚 Shipped")
+        update_status(sheet, row, "Shipped")
         product  = data[PRODUCT_COL - 1]
         customer = data[CUSTOMER_COL - 1]
 
         await update.message.reply_text(
-            f"🚚 *{order_id}* marked as Shipped!\n"
-            f"👤 {customer} | 📦 {product}\n"
-            f"Confirmed by: {user}",
-            parse_mode="Markdown"
+            f"Shipped: {order_id}\n"
+            f"Customer: {customer} | Product: {product}\n"
+            f"Confirmed by: {user}"
         )
     except Exception as e:
-        await update.message.reply_text(f"⚠️ Error: {e}")
+        await update.message.reply_text(f"Error: {e}")
 
 
 async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Usage: /status ORD-001"""
     if not ctx.args:
-        await update.message.reply_text("❌ Usage: /status ORD-001")
+        await update.message.reply_text("Usage: /status ORD-001")
         return
 
     order_id = ctx.args[0].upper()
@@ -154,7 +144,7 @@ async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         row, data = find_order_row(sheet, order_id)
 
         if not row:
-            await update.message.reply_text(f"❌ Order *{order_id}* not found.", parse_mode="Markdown")
+            await update.message.reply_text(f"Order {order_id} not found.")
             return
 
         status   = data[STATUS_COL - 1]
@@ -165,20 +155,18 @@ async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         date     = data[DATE_COL - 1]
 
         await update.message.reply_text(
-            f"📋 *Order {order_id}*\n\n"
+            f"Order {order_id}\n\n"
             f"Status: {status}\n"
-            f"👤 Customer: {customer}\n"
-            f"📦 Product: {product} (x{qty})\n"
-            f"📍 Location: {location}\n"
-            f"📅 Date: {date}",
-            parse_mode="Markdown"
+            f"Customer: {customer}\n"
+            f"Product: {product} (x{qty})\n"
+            f"Location: {location}\n"
+            f"Date: {date}"
         )
     except Exception as e:
-        await update.message.reply_text(f"⚠️ Error: {e}")
+        await update.message.reply_text(f"Error: {e}")
 
 
 async def cmd_pending(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Lists all pending orders"""
     try:
         sheet    = get_sheet()
         all_rows = sheet.get_all_values()
@@ -187,26 +175,26 @@ async def cmd_pending(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         for i, row in enumerate(all_rows, 1):
             if i <= HEADER_ROW or not row or not row[ORDER_ID_COL - 1]:
                 continue
-            if row[STATUS_COL - 1] in ("⏳ Pending", ""):
+            status = row[STATUS_COL - 1]
+            if status in ("Pending", "", "Pending"):
                 pending.append(
-                    f"• *{row[ORDER_ID_COL-1]}* — {row[CUSTOMER_COL-1]} | "
+                    f"- {row[ORDER_ID_COL-1]} | {row[CUSTOMER_COL-1]} | "
                     f"{row[PRODUCT_COL-1]} | {row[LOCATION_COL-1]}"
                 )
 
         if not pending:
-            await update.message.reply_text("✅ No pending orders right now!")
+            await update.message.reply_text("No pending orders right now!")
         else:
-            msg = f"⏳ *Pending Orders ({len(pending)})*\n\n" + "\n".join(pending[:20])
+            msg = f"Pending Orders ({len(pending)})\n\n" + "\n".join(pending[:20])
             if len(pending) > 20:
-                msg += f"\n\n_...and {len(pending)-20} more_"
-            await update.message.reply_text(msg, parse_mode="Markdown")
+                msg += f"\n\n...and {len(pending)-20} more"
+            await update.message.reply_text(msg)
 
     except Exception as e:
-        await update.message.reply_text(f"⚠️ Error: {e}")
+        await update.message.reply_text(f"Error: {e}")
 
 
 async def cmd_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Shows today's delivery summary"""
     try:
         sheet    = get_sheet()
         all_rows = sheet.get_all_values()
@@ -217,38 +205,39 @@ async def cmd_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             if i <= HEADER_ROW or not row or not row[ORDER_ID_COL - 1]:
                 continue
             status = row[STATUS_COL - 1]
-            if "Delivered" in status:  delivered += 1
-            elif "Shipped"  in status:  shipped  += 1
-            elif "Pending"  in status:  pending  += 1
+            if "Delivered" in status:
+                delivered += 1
+            elif "Shipped" in status:
+                shipped += 1
+            elif "Pending" in status or status == "":
+                pending += 1
 
         await update.message.reply_text(
-            f"📊 *Delivery Summary*\n"
-            f"_{today}_\n\n"
-            f"✅ Delivered: {delivered}\n"
-            f"🚚 Shipped:   {shipped}\n"
-            f"⏳ Pending:   {pending}\n"
-            f"📦 Total:     {delivered + shipped + pending}",
-            parse_mode="Markdown"
+            f"Delivery Summary\n"
+            f"{today}\n\n"
+            f"Delivered: {delivered}\n"
+            f"Shipped:   {shipped}\n"
+            f"Pending:   {pending}\n"
+            f"Total:     {delivered + shipped + pending}"
         )
     except Exception as e:
-        await update.message.reply_text(f"⚠️ Error: {e}")
+        await update.message.reply_text(f"Error: {e}")
 
 
 async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📦 *Delivery Bot Commands*\n\n"
-        "/delivered ORD-001 — Mark order as delivered\n"
-        "/shipped ORD-001   — Mark order as shipped\n"
-        "/status ORD-001    — Check order status\n"
-        "/pending           — List all pending orders\n"
-        "/summary           — Today's delivery count",
-        parse_mode="Markdown"
+        "Delivery Bot Commands\n\n"
+        "/delivered ORD-001 - Mark order as delivered\n"
+        "/shipped ORD-001   - Mark order as shipped\n"
+        "/status ORD-001    - Check order status\n"
+        "/pending           - List all pending orders\n"
+        "/summary           - Today's delivery count"
     )
 
 
 # ── Main ─────────────────────────────────────────────────
 if __name__ == "__main__":
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("delivered", cmd_delivered))
     app.add_handler(CommandHandler("shipped",   cmd_shipped))
     app.add_handler(CommandHandler("status",    cmd_status))
@@ -256,5 +245,5 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("summary",   cmd_summary))
     app.add_handler(CommandHandler("help",      cmd_help))
     app.add_handler(CommandHandler("start",     cmd_help))
-    print("🤖 Delivery bot is running...")
-    app.run_polling()
+    print("Delivery bot is running...")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
