@@ -14,7 +14,7 @@ import json
 import logging
 from datetime import datetime
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -237,7 +237,7 @@ async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── Main ─────────────────────────────────────────────────
 if __name__ == "__main__":
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("delivered", cmd_delivered))
     app.add_handler(CommandHandler("shipped",   cmd_shipped))
     app.add_handler(CommandHandler("status",    cmd_status))
@@ -246,4 +246,4 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("help",      cmd_help))
     app.add_handler(CommandHandler("start",     cmd_help))
     print("Delivery bot is running...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    app.run_polling(drop_pending_updates=True)
